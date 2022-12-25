@@ -1,0 +1,258 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(ggmosaic)
+library(RColorBrewer)
+
+theme_set(theme_classic())
+```
+
+### Load data
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+* * *
+
+## Part 1: Data
+
+The background context regarding the assignment can be found at:
+https://www.coursera.org/learn/probability-intro/supplement/1E7zQ/project-information.
+
+### Behavioral Risk Factor Surveillance System
+
+The Behavioral Risk Factor Surveillance System (BRFSS) is a collaborative project between all of the states in the United States (US) and participating US territories and the Centers for Disease Control and Prevention (CDC). The BRFSS is administered and supported by CDC’s Population Health Surveillance Branch, under the Division of Population Health at the National Center for Chronic Disease Prevention and Health Promotion. BRFSS is an ongoing surveillance system designed to measure behavioral risk factors for the non-institutionalized adult population (18 years of age and older) residing in the US. The BRFSS objective is to collect uniform, state-specific data on preventive health practices and risk behaviors that are linked to chronic diseases, injuries, and preventable infectious diseases that affect the adult population.
+
+Factors assessed by the BRFSS in 2013 include tobacco use, HIV/AIDS knowledge and prevention, exercise, immunization, health status, healthy days — health-related quality of life, health care access, inadequate sleep, hypertension awareness, cholesterol awareness, chronic health conditions, alcohol consumption, fruits and vegetables consumption, arthritis burden, and seatbelt use.
+
+Further details about the BRFSS can be obtained from this link:
+https://www.cdc.gov/brfss/annual_data/2013/pdf/Overview_2013.pdf
+
+### Data collection
+
+BRFSS conducts both landline telephone- and cellular telephone-based surveys. In conducting the BRFSS landline telephone survey, interviewers collect data from a randomly selected adult in a household. In conducting the cellular telephone version of the BRFSS questionnaire, interviewers collect data from an adult who participates by using a cellular telephone and resides in a private residence or college housing.
+
+* * *
+
+## Part 2: Research questions
+
+**Research question 1:**
+Is there any correlation between individual income levels and their impact on healthcare coverage and checkup frequency?
+
+**Research question 2:**
+Is there any relationship between the number of sleep hours and the general health of the population as reported by the individuals surveyed?
+
+**Research question 3:**
+Is there any relationship between education level and general health and healthcare coverage?
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+**Data cleaning**
+
+```{r}
+rq <-
+  brfss2013 %>% 
+  select(income2, hlthpln1, checkup1, genhlth, sleptim1, educa)
+
+summary(rq)
+```
+
+There appear to be some outliers in the `sleptim1` variables, making the distribution right-skewed. As the question related to the variable asked how many hours of sleep respondents get in 24 hours, we can safely remove the value above 24. We also need to remove any rows with NA.
+
+```{r}
+rq <- 
+  rq %>% 
+  filter(sleptim1 <= 24) %>% 
+  na.omit()
+
+summary(rq)
+```
+
+**Distribution of related variables**
+
+```{r}
+rq %>% 
+  ggplot(aes(income2)) +
+  geom_bar() +
+  coord_flip() +
+  labs(
+    x = "Income level",
+    y = ""
+  )
+
+rq %>% 
+  ggplot(aes(hlthpln1)) +
+  geom_bar() +
+  labs(
+    x = "Has health plan",
+    y = ""
+  )
+
+rq %>% 
+  ggplot(aes(checkup1)) +
+  geom_bar() +
+  labs(
+    x = "Length Of Time Since Last Routine Checkup",
+    y = ""
+  )
+
+rq %>% 
+  ggplot(aes(sleptim1)) +
+  geom_boxplot() +
+  labs(
+    x = "Sleep time (hours)",
+    y = ""
+  )
+
+rq %>% 
+  ggplot(aes(educa)) +
+  geom_bar() +
+  coord_flip() +
+  labs(
+    x = "Education level",
+    y = ""
+  )
+```
+
+
+**Research question 1:**
+
+```{r}
+rq1 <-
+  rq %>% 
+  select(income2, hlthpln1, checkup1, genhlth)
+
+summary(rq1)
+```
+
+```{r}
+income_hlth <- 
+  rq1 %>% 
+  group_by(income2) %>% 
+  count(hlthpln1) %>% 
+  print()
+
+income_hlth %>% 
+  ggplot(aes(income2, n, fill = hlthpln1)) +
+  geom_bar(position = "fill", stat = "identity") +
+  coord_flip() +
+  labs(
+    x = "Income level",
+    y = "Proportion",
+    fill = "Has health plan"
+  ) +
+  scale_fill_brewer(palette = "Spectral")
+```
+
+From the above figure, the proportion of respondents with a healthcare plan increase as the income level increase.
+
+```{r}
+rq1 %>% 
+  ggplot() +
+  geom_mosaic(aes(product(income2), fill = checkup1)) +
+  coord_flip() +
+  labs(
+    x = "Income level",
+    y = "",
+    fill = "Length Of Time\nSince Last\nRoutine Checkup"
+  ) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  scale_fill_brewer(palette = "Spectral")
+```
+
+There appears to be no correlation between income level and length of time since the last routine checkup as the majority of the respondents with different income levels had routine checkups within the past year.
+
+
+**Research question 2:**
+
+```{r}
+rq2 <-
+  rq %>% 
+  select(sleptim1, genhlth)
+
+summary(rq2)
+```
+
+```{r}
+rq2 %>% 
+  ggplot(aes(genhlth, sleptim1, fill = genhlth)) +
+  geom_boxplot() +
+  labs(
+    x = "General health",
+    y = "Sleep time (hours)"
+  ) +
+  theme(
+    legend.position = "none"
+  ) +
+  scale_fill_brewer(palette = "Spectral")
+```
+
+On average, respondents with poor general health sleep less than respondents with fair to excellent general health. The average sleep time for respondents with reported fair to excellent general health is more than 7 hours while for respondents with reported poor general health is around 6 hours.
+
+
+**Research question 3:**
+
+```{r}
+rq3 <- 
+  rq %>% 
+  select(educa, hlthpln1, checkup1, genhlth)
+
+summary(rq3)
+```
+
+```{r}
+rq3 %>% 
+  ggplot() +
+  geom_mosaic(aes(product(genhlth), fill = educa)) +
+  labs(
+    x = "General health",
+    y = "Education level"
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5)
+  ) +
+  scale_fill_brewer(palette = "Spectral")
+```
+
+From the mosaic plot above, we can see that respondent who has at least 4 years of college reported better general health. Likewise, there is a direct correlation between the number of years spent in education and the reported levels of general health amongst the individuals surveyed.
+
+```{r}
+edu_hlth <- rq3 %>% 
+  filter(!is.na(educa) & !is.na(hlthpln1)) %>% 
+  group_by(educa) %>% 
+  count(hlthpln1) %>% 
+  print()
+
+edu_hlth %>% 
+  ggplot(aes(educa, n, fill = hlthpln1)) +
+  geom_bar(position="fill", stat="identity") +
+  coord_flip() +
+  labs(
+    x = "Education level",
+    y = "Proportion",
+    fill = "Has healthcare coverage"
+  ) +
+  scale_fill_brewer(palette = "Spectral")
+```
+
+Overall, the proportion of respondents with healthcare coverage is higher than those without. There is a clear relationship between education level and healthcare coverage as the higher the education level, the higher the proportion of respondents with healthcare coverage. 
