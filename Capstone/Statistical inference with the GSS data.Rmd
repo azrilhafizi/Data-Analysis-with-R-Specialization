@@ -1,0 +1,110 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+```{r load-data}
+load("gss.Rdata")
+```
+
+* * *
+
+## Part 1: Data
+
+The background context regarding the assignment can be found at:
+https://www.coursera.org/learn/inferential-statistics-intro/supplement/g6E8t/project-instructions-data-files-and-checklist
+
+### General Social Survey
+
+Since 1972, the General Social Survey (GSS) has been monitoring societal change and studying the growing complexity of American society. The GSS aims to gather data on contemporary American society in order to monitor and explain trends and constants in attitudes, behaviors, and attributes; to examine the structure and functioning of society in general as well as the role played by relevant subgroups; to compare the United States to other societies in order to place American society in comparative perspective and develop cross-national models of human society; and to make high-quality data easily accessible to scholars, students, policy makers, and others, with minimal cost and waiting.
+
+GSS questions cover a diverse range of issues including national spending priorities, marijuana use, crime and punishment, race relations, quality of life, confidence in institutions, and sexual behavior.
+
+### Data Collection Methodology
+
+According to [SSRIC](https://www.ssric.org/trd/other/ssda/gssdesc), the GSS (General Social Survey) is an interview survey of U.S. households chosen by using a proportional sampling technique.  Respondents that become part of the GSS sample are from a mix of urban, suburban, and rural geographic areas. The survey is conducted face-to-face with an in-person interview by NORC at the University of Chicago.
+
+* * *
+
+## Part 2: Research question
+
+Does the Americans' confidence in banks and financial institutions decrease after the 2008 financial crisis? 
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+```{r}
+bank_conf <- 
+  gss %>% 
+  filter(!is.na(confinan)) %>% 
+  filter(confinan == "A Great Deal" | confinan == "Hardly Any") %>% 
+  droplevels() %>% 
+  select(year, confinan)
+
+summary(bank_conf)
+```
+
+```{r}
+# change in "A Great Deal" over the years
+bank_conf %>% 
+  group_by(year, confinan) %>% 
+  summarise(n = n()) %>% 
+  mutate(prop = n / sum(n) * 100) %>% 
+  filter(confinan == "A Great Deal") %>% 
+  ggplot(aes(year, prop)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 100)) +
+  geom_vline(xintercept = 2008, color = "grey25", linetype = "dashed") +
+  annotate("text", x = 2008.5, y = 80, label = "2008\nFinancial\nCrisis", hjust = 0) +
+  labs(
+    x = "",
+    y = "",
+    title = "Americans' Confidence In Banks, 1975-2012 Trend",
+    subtitle = "Percentage of respondent answering \"A Great Deal\""
+  )
+```
+
+The line graph above shows the percentage of respondents answering "A Great Deal" to the question "would you say you have a great deal of confidence, only some confidence, or hardly any confidence in the bank and financial institution?". There appears to be a steep decline in confidence after the 2008 financial crisis. 
+
+* * *
+
+## Part 4: Inference
+
+We need to answer the research question with an estimate of the parameter. The inferential tools for estimating population proportions are the confidence interval and the hypothesis test. Since the goal is to construct an interval estimate for a proportion, it's necessary to specify what constitutes a `success`; which here is a response of `A Great Deal`.
+
+### Hypotheses
+
+$$H_0: p_{2006} = p_{2012}$$
+$$H_A: p_{2006} > p_{2012}$$
+
+### Hypothesis Test
+
+```{r}
+bank_conf0612 <- 
+  bank_conf %>% 
+  filter(year == 2006 | year == 2012)
+```
+
+```{r}
+inference(y = confinan, x = as.factor(year), data = bank_conf0612, type = "ht", statistic = "proportion", method = "theoretical", null = 0, alternative = "greater", success = "A Great Deal")
+```
+
+As the p-value < 0.05, there is convincing evidence that Americans' confidence in banks and financial institutions decrease after the 2008 financial crisis.
