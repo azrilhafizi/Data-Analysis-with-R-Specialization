@@ -1,0 +1,279 @@
+---
+title: "Modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(tidyverse)
+library(statsr)
+library(GGally)
+library(RColorBrewer)
+
+theme_set(theme_classic())
+```
+
+### Load data
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+* * *
+
+## Introduction
+
+The background context regarding the assignment can be found at:  
+https://www.coursera.org/learn/linear-regression-model/supplement/UQWxR/project-instructions-data-files-and-checklist
+
+## About the dataset
+
+The data set is comprised of 651 randomly sampled movies produced and released before 2016, including information from Rotten Tomatoes and IMDB.
+
+Therefore, studies based on this sample are:
+
+ - generalizable to the movie released before 2016;
+
+ - not causal, since no random assignment is used in sample collecting.
+
+
+* * *
+
+## Research question
+
+Is there a relationship between critics' scores and the audience score of a movie on Rotten Tomatoes? Moreover, how well could we predict a movie's audience score using its critics' score along with some other variable?
+
+Motivation: movies are often said to be overrated or underrated by professional critics, if so, how much do the critics and audience disagree with each other?
+
+* * *
+
+## Exploratory data analysis
+
+### Relationship between critics and audience score
+
+```{r}
+movies %>% 
+  ggplot(aes(critics_score, audience_score)) +
+  geom_jitter() +
+  labs(
+    x = "Critics score",
+    y = "Audience score",
+    title = "Relationship between critics and audience score"
+  )
+
+cor(movies$critics_score, movies$audience_score)
+```
+
+There appears to be a positive correlation between critics' scores and audience scores.
+
+Before building the linear regression model, lets us find out other variables that can contribute to the audience score.
+
+### Audience score by genre
+
+```{r}
+movies %>% 
+  group_by(genre) %>% 
+  mutate(mean = mean(audience_score)) %>% 
+  ggplot(aes(fct_reorder(genre, mean), audience_score, fill = genre)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(
+    x = "Genre",
+    y = "Audience score",
+    title = "Relationship between audience score and movie genre"
+  ) +
+  scale_fill_brewer(palette = "Spectral") +
+  theme(
+    legend.position = "none"
+  )
+```
+
+It seems like different genres of movies do have different distributions of audience scores. The `Documentary` genre has the highest mean audience score compared to the other movie genres; the `Science Fiction & Fantasy` genre has the biggest spread of audience score.
+
+### Audience score by MPAA rating
+
+```{r}
+movies %>% 
+  group_by(mpaa_rating) %>% 
+  mutate(mean = mean(audience_score)) %>% 
+  ggplot(aes(fct_reorder(mpaa_rating, mean), audience_score, fill = mpaa_rating)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(
+    x = "MPAA rating",
+    y = "Audience score",
+    title = "Relationship between audience score and MPAA rating"
+  ) +
+  scale_fill_brewer(palette = "Spectral") +
+  theme(
+    legend.position = "none"
+  )
+```
+
+The MPAA rating also seems to influence the audience score.
+
+### Audience score by best picture Oscar nomination
+
+```{r}
+movies %>% 
+  ggplot(aes(best_pic_nom, audience_score, fill = best_pic_nom)) +
+  geom_boxplot() +
+  labs(
+    x = "Oscar nominated",
+    y = "Audience score",
+    title = "Relationship between audience score and Oscar nomination"
+  ) +
+  scale_fill_brewer(palette = "Spectral") +
+  theme(
+    legend.position = "none"
+  )
+```
+
+The movies nominated for best picture Oscar receive higher audience scores.
+
+### Relationship between IMDB rating and audience score
+
+```{r}
+movies %>% 
+  ggplot(aes(imdb_rating, audience_score)) +
+  geom_jitter() +
+  labs(
+    x = "IMDB rating",
+    y = "Audience score",
+    title = "Relationship between IMDB rating and audience score"
+  )
+
+cor(movies$imdb_rating, movies$audience_score)
+```
+
+* * *
+
+## Part 4: Modeling
+
+For finding the perfect model to predict the audience score, we are going to use the backward selection approach. Backward selection starts with all predictors in the model and removes the predictor with the largest p-value (least statistically significant). The new (p - 1) model is fit, and the predictor with the largest p-value is removed. We then stop when we have a model where all predictors are statistically significant. Backward selection requires that the number of samples n is larger than the number of variables p so that the full model can be fit.
+
+```{r}
+movies_df <-
+  movies %>% 
+  select(genre, mpaa_rating, imdb_rating, critics_score, audience_score, best_pic_nom)
+```
+
+The create the model, we need to subset the dataset into useful predictors only. 
+
+```{r}
+# define intercept-only model
+intercept_only <- lm(audience_score ~ 1, data = movies_df)
+
+# define model with all predictors
+fullmodel <- lm(audience_score ~ ., data = movies_df)
+
+# perform backward stepwise regression
+backward <- step(fullmodel, direction = "backward", scope = formula(fullmodel), trace = 0)
+
+# view results of backward stepwise regression
+backward$anova
+
+# view final model
+backward$coefficients
+```
+
+Here is how to interpret the results:
+
+ - We fit a model using all p predictors. Define this as $M_p$.
+ - For k = p, p-1, … 1, we fit all k models that contain all but one of the predictors in $M_k$, for a total of k-1 predictor variables. Next, pick the best among these k models and call it $M_{k-1}$.
+ - We pick a single best model from among $M_0…M_p$ using AIC.
+ 
+The final model turns out to be:
+
+```{r}
+model <- lm(audience_score ~ . - mpaa_rating - best_pic_nom, data = movies_df)
+
+summary(model)
+```
+
+The p-value associated with the F-statistic is less than 2.2e-16; the model as a whole is significant, and at least one of the slopes does not equal 0. The model has a $R^2$ value 0f 0.7683; 76.83% of the variability in data is explained by the model.
+
+### Model Diagnostic
+
+Before making predictions, we would like to check if our model satisfies all the conditions for a multiple linear regression model.
+
+1. Linearity
+We are going to create a scatterplot of the model residuals versus the numerical explanatory variables, `imdb_rating` and `critics_score`.
+
+```{r}
+imdb_residual <- data.frame(residuals = model$residuals, imdb_rating = movies$imdb_rating)
+critic_residual <- data.frame(residuals = model$residuals, critics_score = movies$critics_score)
+
+ggplot(imdb_residual, aes(imdb_rating, residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    x = "IMDB rating",
+    y = "Residuals")
+
+ggplot(critic_residual, aes(critics_score, residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    x = "Critics score",
+    y = "Residuals")
+```
+
+The residuals are distributed randomly scattered around 0, which means that the conditions is met.
+
+2. Nearly normal residual
+
+```{r}
+ggplot(data = model, aes(x = .resid)) +
+  geom_histogram(binwidth = 5) +
+  labs(x = "Residuals", y = "Count")
+```
+
+The model residuals seems normally distributed around 0, which means that this condition is satisfied as well.
+
+* * *
+
+## Prediction
+
+We can now use the model to predict the audience score for new movies (movies released after 2016). For this task, we are going to predict the audience score of `Bullet Train(2022)`, `The Social Dilemma(2020)`, `Tenet`(2020), `The Call`(2020), and `Spenser Confidential`(2020). The real audience score of those movies is 76, 83, 76, 78, and 51 respectively.
+
+```{r}
+new_movies <- data.frame(
+  genre = c("Action & Adventure", "Documentary", "Action & Adventure", "Horror", "Comedy"),
+  mpaa_rating = c("R", "PG-13", "PG-13", "R", "R"),
+  critics_score = c(54, 85, 69, 100, 36),
+  imdb_rating = c(7.3, 7.6, 7.3, 7.1, 6.2),
+  best_pic_nom = c("no", "no", "no", "no", "no")
+)
+
+real_score <- c(76, 83, 76, 78, 51)
+
+prediction <- as.data.frame(predict(model, new_movies, interval = "prediction", level = 0.95))
+
+prediction$score <- real_score
+
+prediction$title <- c("Bullet Train", "The Social Dilemma", "Tenet", "The Call", "Spenser Confidential")
+
+prediction %>% 
+  ggplot(aes(fit, score, color = title)) +
+  geom_point(size = 2) +
+  geom_abline(intercept = 0,
+              slope = 1,
+              color = "red") +
+  labs(
+    x = "Prediction",
+    y = "Actual score"
+  ) +
+  scale_color_brewer(palette = "Spectral")
+
+rsq <- function (x, y) cor(x, y) ^ 2
+
+rsq(prediction$fit, prediction$score)
+```

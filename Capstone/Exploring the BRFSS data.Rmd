@@ -28,9 +28,9 @@ load("brfss2013.RData")
 
 * * *
 
-## Part 1: Data
+## Introduction
 
-The background context regarding the assignment can be found at:
+The background context regarding the assignment can be found at:  
 https://www.coursera.org/learn/probability-intro/supplement/1E7zQ/project-information.
 
 ### Behavioral Risk Factor Surveillance System
@@ -48,7 +48,7 @@ BRFSS conducts both landline telephone- and cellular telephone-based surveys. In
 
 * * *
 
-## Part 2: Research questions
+## Research questions
 
 **Research question 1:**
 Is there any correlation between individual income levels and their impact on healthcare coverage and checkup frequency?
@@ -61,7 +61,7 @@ Is there any relationship between education level and general health and healthc
 
 * * *
 
-## Part 3: Exploratory data analysis
+## Exploratory data analysis
 
 **Data cleaning**
 

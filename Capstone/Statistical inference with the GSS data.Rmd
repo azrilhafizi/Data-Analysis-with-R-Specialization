@@ -15,6 +15,8 @@ output:
 library(ggplot2)
 library(dplyr)
 library(statsr)
+
+theme_set(theme_classic())
 ```
 
 ### Load data
@@ -25,9 +27,9 @@ load("gss.Rdata")
 
 * * *
 
-## Part 1: Data
+## Introduction
 
-The background context regarding the assignment can be found at:
+The background context regarding the assignment can be found at:  
 https://www.coursera.org/learn/inferential-statistics-intro/supplement/g6E8t/project-instructions-data-files-and-checklist
 
 ### General Social Survey
@@ -42,13 +44,13 @@ According to [SSRIC](https://www.ssric.org/trd/other/ssda/gssdesc), the GSS (Gen
 
 * * *
 
-## Part 2: Research question
+## Research question
 
 Does the Americans' confidence in banks and financial institutions decrease after the 2008 financial crisis? 
 
 * * *
 
-## Part 3: Exploratory data analysis
+## Exploratory data analysis
 
 ```{r}
 bank_conf <- 
@@ -86,7 +88,7 @@ The line graph above shows the percentage of respondents answering "A Great Deal
 
 * * *
 
-## Part 4: Inference
+## Inference
 
 We need to answer the research question with an estimate of the parameter. The inferential tools for estimating population proportions are the confidence interval and the hypothesis test. Since the goal is to construct an interval estimate for a proportion, it's necessary to specify what constitutes a `success`; which here is a response of `A Great Deal`.
 
